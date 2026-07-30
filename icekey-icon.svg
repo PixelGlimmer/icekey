@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#091A33"/>
+      <stop offset="1" stop-color="#040610"/>
+    </linearGradient>
+    <linearGradient id="ice" x1="16" y1="12" x2="50" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E6F4FF"/>
+      <stop offset="0.45" stop-color="#93C4FF"/>
+      <stop offset="1" stop-color="#3D67FF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(22 18) rotate(42) scale(38 34)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#bg)"/>
+  <rect width="64" height="64" rx="18" fill="url(#glow)"/>
+  <path d="M32 10L48 16.8V28.8C48 38.7 42 47.1 32 52C22 47.1 16 38.7 16 28.8V16.8L32 10Z" fill="url(#ice)" stroke="#F2FAFF" stroke-opacity="0.28" stroke-width="1.4"/>
+  <path d="M24.5 28.6V25.5C24.5 21.3 27.9 18 32 18C36.1 18 39.5 21.3 39.5 25.5V28.6" stroke="#F6FBFF" stroke-width="2.8" stroke-linecap="round"/>
+  <rect x="21.5" y="28" width="21" height="16.2" rx="8.1" fill="#F6FBFF" fill-opacity="0.13" stroke="#F6FBFF" stroke-opacity="0.34" stroke-width="1.6"/>
+  <path d="M32 33.2C30.7 33.2 29.7 34.2 29.7 35.5C29.7 36.5 30.3 37.4 31.2 37.8V40.8C31.2 41.3 31.6 41.7 32.1 41.7C32.6 41.7 33 41.3 33 40.8V37.8C33.9 37.4 34.5 36.5 34.5 35.5C34.5 34.2 33.5 33.2 32 33.2Z" fill="#F6FBFF"/>
+</svg>

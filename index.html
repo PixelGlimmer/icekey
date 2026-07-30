@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>IceKey · 2FA</title>
+  <meta name="theme-color" content="#000D08">
+  <link rel="icon" href="icekey-icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js">
+  </script>
+  <style>
+    /* ===== RESET & BASE ===== */
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      background:
+        radial-gradient(circle at 18% 20%, rgba(79, 118, 255, 0.18), transparent 34%),
+        radial-gradient(circle at 82% 16%, rgba(143, 199, 255, 0.12), transparent 30%),
+        linear-gradient(180deg, #040814 0%, #050b18 48%, #02050d 100%);
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Rubik', sans-serif;
+      color: #fff;
+      background:
+        radial-gradient(circle at top, rgba(95, 148, 255, 0.08), transparent 28%),
+        linear-gradient(180deg, rgba(6, 12, 28, 0.98), rgba(2, 6, 16, 1));
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ===== BACKGROUND ===== */
+    .bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+    .bg-canvas canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .bg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 30%, rgba(143, 199, 255, 0.08), transparent 32%),
+        linear-gradient(to bottom, rgba(3, 8, 22, 0.4) 0%, rgba(3, 8, 22, 0.14) 42%),
+        linear-gradient(to top, #02050d 0%, rgba(5, 11, 24, 0.55) 22%, transparent 42%);
+    }
+
+    .content {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+    }
+
+    /* ===== CARD ===== */
+    .card {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: 28px;
+      padding: 36px 28px 32px;
+      border: 1px solid rgba(143, 199, 255, 0.14);
+      box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.48),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      text-align: center;
+    }
+
+    /* ===== HEADER ===== */
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.08));
+    }
+    .brand-text {
+      font-weight: 600;
+      font-size: 22px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.96);
+      text-shadow: 0 0 22px rgba(143, 199, 255, 0.12);
+    }
+    .brand-text span {
+      color: #8fc7ff;
+      font-weight: 700;
+    }
+
+    .sub {
+      font-size: 12px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    /* ===== CODE DISPLAY ===== */
+    .code-display {
+      padding: 28px 16px 20px;
+      background:
+        linear-gradient(180deg, rgba(10, 18, 38, 0.72), rgba(5, 10, 24, 0.88));
+      border-radius: 20px;
+      cursor: pointer;
+      transition: 0.3s;
+      user-select: none;
+      border: 1px solid transparent;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .code-display:hover {
+      background:
+        linear-gradient(180deg, rgba(12, 22, 44, 0.84), rgba(6, 11, 28, 0.96));
+      border-color: rgba(143, 199, 255, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.34), 0 0 24px rgba(75, 125, 255, 0.08);
+    }
+
+    .code-value {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: row;
+      font-family: 'Rubik', monospace;
+      width: 100%;
+      font-size: 72px;
+      font-weight: 600;
+      letter-spacing: 8px;
+      white-space: nowrap;
+      text-align: center;
+      background: linear-gradient(135deg, #8fc7ff, #4b7dff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .code-value.vertical {
+      flex-direction: column;
+      gap: 4px;
+      line-height: 0.92;
+      letter-spacing: 6px;
+      white-space: normal;
+    }
+
+    .copy-hint {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.2);
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
+
+    /* ===== TIMER ===== */
+    .timer-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin: 8px 0 6px;
+    }
+    .timer-number {
+      font-family: 'Rubik', monospace;
+      font-size: 40px;
+      font-weight: 500;
+      color: #8fc7ff;
+      min-width: 54px;
+    }
+    .timer-label {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.25);
+      font-weight: 300;
+    }
+
+    progress {
+      width: 100%;
+      height: 3px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border: none;
+      appearance: none;
+    }
+    progress::-webkit-progress-bar {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+    }
+    progress::-webkit-progress-value {
+      background: linear-gradient(90deg, #8fc7ff, #4b7dff);
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+    progress::-moz-progress-bar {
+      background: linear-gradient(90deg, #8fc7ff, #4b7dff);
+      border-radius: 4px;
+    }
+
+    .key-hint {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.15);
+      font-family: 'Rubik', monospace;
+      margin-top: 16px;
+      letter-spacing: 0.5px;
+      word-break: break-all;
+    }
+
+    /* ===== EMPTY ===== */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 40px 0 30px;
+      color: rgba(255, 255, 255, 0.12);
+    }
+    .empty-state svg {
+      opacity: 0.3;
+    }
+    .empty-state span {
+      font-size: 14px;
+      font-weight: 300;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(0, 13, 8, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(143, 199, 255, 0.2);
+      color: #fff;
+      padding: 12px 26px;
+      border-radius: 40px;
+      font-size: 14px;
+      font-weight: 400;
+      opacity: 0;
+      transition: 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+      pointer-events: none;
+      z-index: 999;
+      max-width: 90vw;
+      font-family: 'Rubik', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    .toast-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #8fc7ff;
+      flex-shrink: 0;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 480px) {
+      .content {
+        padding: 12px;
+      }
+      .card {
+        padding: 28px 16px 24px;
+        border-radius: 20px;
+      }
+      .code-value {
+        font-size: 40px;
+        letter-spacing: 6px;
+      }
+      .timer-number {
+        font-size: 34px;
+        min-width: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== BACKGROUND ===== -->
+  <div class="bg-canvas" id="bgCanvas"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="content">
+    <div class="card">
+
+      <!-- Brand -->
+      <div class="brand"><span class="brand-text">Ice<span>Key</span></span>
+      </div>
+      <div class="sub">Двухфакторный код</div>
+
+      <!-- ===== CODE DISPLAY ===== -->
+      <div id="emptyState" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M12 6v6l4 2"/></svg>
+        <span>Ключ не указан в URL</span>
+        <span style="font-size:12px;opacity:0.5;">?2fa=ВАШ_BASE32_КЛЮЧ</span>
+      </div>
+
+      <div id="codeContent" class="hidden">
+        <div class="code-display" id="codeDisplay">
+          <div class="code-value" id="codeValue">000 000</div>
+          <div class="copy-hint">Нажмите, чтобы скопировать</div>
+        </div>
+
+        <div class="timer-row">
+          <span class="timer-number" id="timeCounter">30</span>
+          <span class="timer-label">сек до обновления</span>
+        </div>
+        <progress id="progressBar" value="30" max="30"></progress>
+
+        <div class="key-hint" id="keyHint">••••</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div class="toast" id="toast">
+    <span class="toast-dot"></span>
+    <span id="toastText">Готово</span>
+  </div>
+
+  <!-- ===== SHADER ===== -->
+  <script>
+    (function() {
+      const container = document.getElementById('bgCanvas');
+      const canvas = document.createElement('canvas');
+      container.appendChild(canvas);
+      const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
+      if (!gl) return;
+
+      const vertSrc = `#version 300 es
+  in vec2 position;
+  void main() { gl_Position = vec4(position, 0.0, 1.0); }`;
+
+      const fragSrc = `#version 300 es
+  precision highp float;
+  uniform vec2 iResolution;
+  uniform float iTime;
+  out vec4 fragColor;
+  #define S(a,b,t) smoothstep(a,b,t)
+  mat2 Rot(float a){float s=sin(a),c=cos(a);return mat2(c,-s,s,c);}
+  vec2 hash(vec2 p){p=vec2(dot(p,vec2(2127.1,81.17)),dot(p,vec2(1269.5,283.37)));return fract(sin(p)*43758.5453);}
+  float noise(vec2 p){vec2 i=floor(p),f=fract(p),u=f*f*(3.0-2.0*f);float n=mix(mix(dot(-1.0+2.0*hash(i),f),dot(-1.0+2.0*hash(i+vec2(1,0)),f-vec2(1,0)),u.x),mix(dot(-1.0+2.0*hash(i+vec2(0,1)),f-vec2(0,1)),dot(-1.0+2.0*hash(i+vec2(1,1)),f-vec2(1,1)),u.x),u.y);return 0.5+0.5*n;}
+  void main(){
+    vec3 uColor1=vec3(143.0/255.0,199.0/255.0,255.0/255.0);
+    vec3 uColor2=vec3(33.0/255.0,55.0/255.0,124.0/255.0);
+    vec3 uColor3=vec3(4.0/255.0,10.0/255.0,26.0/255.0);
+    float t=iTime*0.4;
+    vec2 uv=gl_FragCoord.xy/iResolution.xy;
+    float ratio=iResolution.x/iResolution.y;
+    vec2 tuv=uv-0.5;
+    tuv/=0.9;
+    float degree=noise(vec2(t*0.1,tuv.x*tuv.y)*2.0);
+    tuv.y*=1.0/ratio;
+    tuv*=Rot(radians((degree-0.5)*500.0+180.0));
+    tuv.y*=ratio;
+    float amplitude=42.0;
+    float warpTime=t*2.0;
+    tuv.x+=sin(tuv.y*5.0+warpTime)/amplitude;
+    tuv.y+=sin(tuv.x*7.5+warpTime)/(amplitude*0.5);
+    float s=0.05;
+    mat2 blendRot=Rot(0.0);
+    float blendX=(tuv*blendRot).x;
+    vec3 layer1=mix(uColor3,uColor2,S(-0.3-s,0.2+s,blendX));
+    vec3 layer2=mix(uColor2,uColor1,S(-0.3-s,0.2+s,blendX));
+    vec3 col=mix(layer1,layer2,S(0.5+s,-0.3-s,tuv.y));
+    vec2 grainUv=uv*2.0;
+    float grain=fract(sin(dot(grainUv,vec2(12.9898,78.233)))*43758.5453);
+    col+=(grain-0.5)*0.055;
+    col=(col-0.5)*1.28+0.5;
+    float glow = 0.18 / (length(uv - vec2(0.52, 0.34)) * 7.0 + 0.5);
+    col += vec3(0.10, 0.16, 0.28) * glow;
+    float luma=dot(col,vec3(0.2126,0.7152,0.0722));
+    col=mix(vec3(luma),col,1.0);
+    col=clamp(col,0.0,1.0);
+    fragColor=vec4(col,1.0);
+  }`;
+
+      function compile(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+          console.error(gl.getShaderInfoLog(s));
+          return null;
+        }
+        return s;
+      }
+
+      const prog = gl.createProgram();
+      gl.attachShader(prog, compile(gl.VERTEX_SHADER, vertSrc));
+      gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragSrc));
+      gl.linkProgram(prog);
+      gl.useProgram(prog);
+
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const posLoc = gl.getAttribLocation(prog, 'position');
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+      const uRes = gl.getUniformLocation(prog, 'iResolution');
+      const uTime = gl.getUniformLocation(prog, 'iTime');
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const t0 = performance.now();
+
+      function frame(t) {
+        const w = Math.round(window.innerWidth * dpr);
+        const h = Math.round(window.innerHeight * dpr);
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+        gl.uniform1f(uTime, (t - t0) * 0.001);
+        gl.bindVertexArray(vao);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+
+  <!-- ===== 2FA LOGIC ===== -->
+  <script>
+    (function() {
+      'use strict';
+
+      // DOM
+      const emptyState = document.getElementById('emptyState');
+      const codeContent = document.getElementById('codeContent');
+      const codeValue = document.getElementById('codeValue');
+      const codeDisplay = document.getElementById('codeDisplay');
+      const timeCounter = document.getElementById('timeCounter');
+      const progressBar = document.getElementById('progressBar');
+      const keyHint = document.getElementById('keyHint');
+      const toast = document.getElementById('toast');
+      const toastText = document.getElementById('toastText');
+
+      let currentToken = '';
+      let updateInterval = null;
+      let toastTimeout = null;
+
+      function fitCodeText() {
+        const containerWidth = codeDisplay.clientWidth - 32;
+        if (!containerWidth) return;
+
+        const minFont = 24;
+        const maxFont = window.innerWidth <= 480 ? 40 : 72;
+        let fontSize = maxFont;
+        let letterSpacing = window.innerWidth <= 480 ? 6 : 8;
+        const rawCode = codeValue.textContent.replace(/\s+/g, '');
+        const horizontalCode = rawCode.length >= 6 ? rawCode.slice(0, 3) + ' ' + rawCode.slice(3, 6) : codeValue.textContent;
+
+        codeValue.classList.remove('vertical');
+        codeValue.textContent = horizontalCode;
+        codeValue.style.fontSize = fontSize + 'px';
+        codeValue.style.letterSpacing = letterSpacing + 'px';
+
+        while (fontSize > minFont && codeValue.scrollWidth > containerWidth) {
+          fontSize -= 1;
+          if (fontSize < 36) letterSpacing = Math.max(2, letterSpacing - 0.25);
+          codeValue.style.fontSize = fontSize + 'px';
+          codeValue.style.letterSpacing = letterSpacing + 'px';
+        }
+
+        if (codeValue.scrollWidth > containerWidth && rawCode.length >= 6) {
+          codeValue.classList.add('vertical');
+          codeValue.innerHTML = '<span>' + rawCode.slice(0, 3) + '</span><span>' + rawCode.slice(3, 6) + '</span>';
+          codeValue.style.fontSize = Math.min(fontSize + 6, maxFont) + 'px';
+          codeValue.style.letterSpacing = Math.max(2, letterSpacing - 1) + 'px';
+        }
+      }
+
+      // ===== Toast =====
+      function showToast(msg, type) {
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastText.textContent = msg;
+        toast.classList.add('show');
+        const dot = toast.querySelector('.toast-dot');
+        dot.style.background = type === 'error' ? '#ff6b6b' : '#8fc7ff';
+        toastTimeout = setTimeout(() => toast.classList.remove('show'), 2800);
+      }
+
+      // ===== Copy =====
+      function copyFallback(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast('Скопировано!', 'success');
+        } catch (e) {
+          showToast('Ошибка копирования', 'error');
+        }
+        document.body.removeChild(ta);
+      }
+
+      function copyText(text) {
+        if (!text) { showToast('Нет кода', 'error'); return; }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            showToast('Скопировано!', 'success');
+          }).catch(() => copyFallback(text));
+        } else {
+          copyFallback(text);
+        }
+      }
+
+      // ===== Base32 → Hex =====
+      function base32ToHex(base32) {
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        base32 = base32.toUpperCase().replace(/=+$/, '').replace(/\s/g, '');
+        if (!base32) return '';
+        for (let i = 0; i < base32.length; i++) {
+          if (alphabet.indexOf(base32.charAt(i)) === -1) {
+            throw new Error('Invalid Base32 char');
+          }
+        }
+        let bits = '';
+        for (let i = 0; i < base32.length; i++) {
+          const val = alphabet.indexOf(base32.charAt(i));
+          bits += val.toString(2).padStart(5, '0');
+        }
+        let hex = '';
+        for (let i = 0; i + 8 <= bits.length; i += 8) {
+          const byte = bits.substr(i, 8);
+          hex += parseInt(byte, 2).toString(16).padStart(2, '0');
+        }
+        return hex;
+      }
+
+      // ===== TOTP =====
+      function generateTOTP(secret) {
+        try {
+          const key = base32ToHex(secret);
+          if (!key) throw new Error('Invalid key');
+          const time = Math.floor(Date.now() / 1000 / 30);
+          const timeHex = ('0000000000000000' + time.toString(16)).slice(-16);
+          const keyWords = CryptoJS.enc.Hex.parse(key);
+          const hmac = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(timeHex), keyWords);
+          const hmacHex = hmac.toString(CryptoJS.enc.Hex);
+          const offset = parseInt(hmacHex.slice(-1), 16) * 2;
+          const otpHex = hmacHex.substr(offset, 8);
+          let otp = parseInt(otpHex, 16) & 0x7fffffff;
+          otp = otp % 1000000;
+          const formatted = otp.toString().padStart(6, '0');
+          return formatted.substring(0, 3) + ' ' + formatted.substring(3);
+        } catch (e) {
+          console.error(e);
+          showToast('Ошибка генерации', 'error');
+          return 'ОШИБКА';
+        }
+      }
+
+      // ===== Update UI =====
+      function updateCode() {
+        if (!currentToken) return;
+        const code = generateTOTP(currentToken);
+        const timeLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
+        codeValue.textContent = code;
+        fitCodeText();
+        timeCounter.textContent = timeLeft < 10 ? '0' + timeLeft : timeLeft;
+        progressBar.value = 30 - timeLeft;
+
+        if (timeLeft < 10) {
+          progressBar.style.background = 'linear-gradient(90deg, #ff6b6b, #ff9a9a)';
+        } else if (timeLeft < 20) {
+          progressBar.style.background = 'linear-gradient(90deg, #fbbf24, #fcd34d)';
+        } else {
+          progressBar.style.background = 'linear-gradient(90deg, #8fc7ff, #4b7dff)';
+        }
+      }
+
+      function showCode(token) {
+        emptyState.classList.add('hidden');
+        codeContent.classList.remove('hidden');
+        const preview = token.length > 28 ? token.substring(0, 28) + '…' : token;
+        keyHint.textContent = preview;
+        updateCode();
+      }
+
+      function startInterval() {
+        if (updateInterval) clearInterval(updateInterval);
+        updateInterval = setInterval(updateCode, 1000);
+      }
+
+      // ===== Init from URL =====
+      function initFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('2fa');
+        if (token) {
+          const cleaned = token.toUpperCase().replace(/[^A-Z2-7=]/g, '');
+          if (cleaned.length > 0) {
+            currentToken = cleaned;
+            showCode(currentToken);
+            startInterval();
+            // update URL without reload
+            const url = new URL(window.location);
+            url.searchParams.set('2fa', currentToken);
+            window.history.replaceState({}, '', url);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      // ===== Click to copy =====
+      codeDisplay.addEventListener('click', function() {
+        if (!currentToken) return;
+        const code = codeValue.textContent.replace(/\s/g, '');
+        copyText(code);
+      });
+
+      // ===== Init =====
+      document.addEventListener('DOMContentLoaded', function() {
+        const hasToken = initFromURL();
+        fitCodeText();
+        if (!hasToken) {
+          // показываем пример в empty
+          const example = document.querySelector('.empty-state span:last-child');
+          if (example) {
+            const url = window.location.origin + window.location.pathname;
+            example.textContent = '?2fa=JBSWY3DPEHPK3PXP';
+          }
+        }
+      });
+
+      window.addEventListener('resize', fitCodeText);
+
+    })();
+  </script>
+
+</body>
+</html>
